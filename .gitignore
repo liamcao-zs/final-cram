@@ -5,3 +5,11 @@ __pycache__/
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# 运行时产物
+_extract/
+_preview/
+_extract*/
+.cache/
+~$*.docx
+~$*.doc

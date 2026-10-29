@@ -27,7 +27,7 @@
 
 Word 里：目录可点击跳转，每章末尾可返回目录，四角有你的小人图，页脚有页码。
 
-交付前 `check_docs.py` 会自动检查 13 项：题号对应、答案完整性、答案字母、答案泄漏、近重复题、缺图、两版对齐、耍起次数、游戏化措辞、表格列数等。
+交付前 `check_docs.py` 会自动检查 14 项：题号对应、答案完整性、答案字母、答案泄漏、题干一致、题号连续、近重复题、缺图、两版对齐、本章速览、耍起次数、游戏化措辞、表格列数等。
 
 ## 自己改内容
 
@@ -43,7 +43,7 @@ python ~/.claude/skills/final-cram/scripts/build_docx.py \
 Windows + Python 3.10+，依赖：
 
 ```bash
-pip install python-docx pymupdf lxml pillow pywin32
+pip install -r requirements.txt
 ```
 
 `verify_docx.py` 需要本机安装 Microsoft Word（用 COM 导 PDF 做验收）；没有 Word 时跳过验收步骤即可。

@@ -19,6 +19,7 @@ extract_materials.py — 把课程资料统一转成可读 Markdown + 可直接�
 """
 
 import argparse
+import hashlib
 import json
 import re
 import shutil
@@ -135,7 +136,7 @@ def do_pdf(path: Path, out: Path, max_images: int, page_mode="low"):
                     if (not raw or len(data) > 3_000_000 or len(data) < 4_000
                             or raw.get("width", 0) < 90 or raw.get("height", 0) < 90):
                         continue
-                    digest = hash(data)
+                    digest = hashlib.sha1(data).hexdigest()
                     if digest in seen_images:
                         continue
                     seen_images.add(digest)
@@ -262,6 +263,22 @@ def do_pptx(path: Path, out: Path, max_images: int, render_slides=True):
                 note_texts[int(m.group(1))] = "\n".join(
                     t.text for t in root.iter(f"{{{NS_A}}}t") if t.text and t.text.strip())
 
+        def slide_notes(no: int) -> str:
+            """通过 slide 的关系文件找备注；notesSlideN 的编号不保证与页码相同。"""
+            rels = f"ppt/slides/_rels/slide{no}.xml.rels"
+            if rels not in names:
+                return ""
+            try:
+                rel_root = etree.fromstring(z.read(rels))
+            except Exception:
+                return ""
+            for rel in rel_root:
+                if rel.get("Type", "").endswith("/notesSlide"):
+                    m = re.search(r"notesSlide(\d+)\.xml", rel.get("Target", ""))
+                    if m:
+                        return note_texts.get(int(m.group(1)), "")
+            return ""
+
         for s in slides:
             no = int(re.search(r"slide(\d+)\.xml", s).group(1))
             slide_numbers.append(no)
@@ -294,8 +311,9 @@ def do_pptx(path: Path, out: Path, max_images: int, render_slides=True):
             text_lines.append(f"## [slide {no}]")
             if body:
                 text_lines.append(body)
-            if note_texts.get(no):
-                text_lines.append(f"> 备注: {note_texts[no].strip()}")
+            note = slide_notes(no)
+            if note:
+                text_lines.append(f"> 备注: {note.strip()}")
             text_lines.append("")
 
     # 整页渲染：PPT → PDF → PNG，矢量图/公式/排版全保真

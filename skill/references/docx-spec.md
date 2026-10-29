@@ -189,7 +189,10 @@ python $B/crop_image.py --src _extract/pages/hw/p003.png \
 B=~/.claude/skills/final-cram/scripts
 
 # 0. 结构自检（题号、答案泄漏、缺图、两版对齐）
-python $B/check_docs.py \n  --questions _source/questions.md --answers _source/answers.md \n  --grandma _source/notes_grandma.md --muscle _source/notes_muscle.md \n  --base-dir _source
+python "$B/check_docs.py" \
+  --questions _source/questions.md --answers _source/answers.md \
+  --grandma _source/notes_grandma.md --muscle _source/notes_muscle.md \
+  --base-dir _source
 
 # 1. 生成
 python $B/build_docx.py --src _source/notes_grandma.md --out 01_速通笔记_老奶版.docx

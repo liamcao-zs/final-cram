@@ -13,7 +13,7 @@
   <img src="https://img.shields.io/badge/platform-Windows%20%2B%20Office-1F4E5F?style=flat-square" alt="platform">
   <img src="https://img.shields.io/badge/python-3.10%2B-3776AB?style=flat-square" alt="python">
   <img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="license">
-  <img src="https://img.shields.io/badge/version-1.0.0-black?style=flat-square" alt="version">
+  <img src="https://img.shields.io/badge/version-1.1.0-black?style=flat-square" alt="version">
   <img src="https://img.shields.io/badge/Claude-Skill-d97757?style=flat-square" alt="claude skill">
 </p>
 
@@ -85,7 +85,7 @@ Word 里还顺手做了：可点击目录、每章返回目录、四角水印、
 
 ### 方式一：下载 Release
 
-从 [Releases](https://github.com/liamcao-zs/final-cram/releases/latest) 下载 `final-cram-v1.0.zip`，解压后把 `final-cram/` 放进：
+从 [Releases](https://github.com/liamcao-zs/final-cram/releases/latest) 下载 `final-cram-v1.1.zip`，解压后把 `final-cram/` 放进：
 
 ```
 ~/.claude/skills/
@@ -105,8 +105,10 @@ cp -r final-cram/skill ~/.claude/skills/final-cram
 - Microsoft Word / PowerPoint（导出整页图、视觉验收用）
 
 ```bash
-pip install python-docx pymupdf lxml pillow pywin32
+pip install -r skill/requirements.txt
 ```
+
+从 Release 安装时，路径换成 `~/.claude/skills/final-cram/requirements.txt`。
 
 ## 用一句话开始
 
@@ -118,14 +120,16 @@ pip install python-docx pymupdf lxml pillow pywin32
 
 ## 它怎么保证不糊弄
 
-不是「生成完就说好了」。交付前会跑 13 项机械检查：
+不是「生成完就说好了」。交付前会跑 14 项机械检查：
 
 - 题号是否一一对应、答案是否每题都有；
-- 答案字母是否真的在选项里；
+- 答案字母是否真的在选项里（计算题不会被误判）；
 - 无答案版是否混入答案；
+- 答案版和无答案版的题干是否逐题一致；
+- 每章题号是否从 1 开始且连续；
 - 题目之间是否近重复（同公式换数字会被抓出来，阈值 0.86）；
-- 引用的图片是否都存在；
-- 两版笔记的章节是否对齐；
+- 引用的图片是否都存在，写了「如图」却整篇没图会被提醒；
+- 两版笔记的章节是否对齐，每章是否有「本章速览」；
 - 表格列数、front matter、游戏化措辞……
 
 另外还有几条硬规矩：每题必须自己算过、材料没有的内容标 `（AI补充）`、秒杀招式必须带适用条件。
@@ -155,21 +159,29 @@ pip install python-docx pymupdf lxml pillow pywin32
 
 ```
 final-cram/
-├── skill/          # 可安装的 Claude Skill
+├── skill/            # 可安装的 Claude Skill
 │   ├── SKILL.md
-│   ├── references/ # 7 份规范
-│   ├── scripts/    # 6 个脚本
-│   └── examples/   # 示例源文件
-├── docs/           # README 预览图
-├── assets/         # 512×512 图标
-├── dist/           # 打包产物（同时发 Release）
-└── private/        # 本地课程资料，不上传
+│   ├── references/   # 7 份规范
+│   ├── scripts/      # 6 个脚本
+│   ├── examples/     # 示例源文件
+│   ├── assets/       # 水印与图标
+│   └── requirements.txt
+├── .github/          # CI：语法检查 + 示例自检
+├── docs/             # README 预览图
+├── assets/           # 512×512 图标
+├── dist/             # 本地打包产物，gitignore，发 Release 时附上
+└── private/          # 本地课程资料，不上传
 ```
 
 ## 彩蛋
 
 - 老奶版：这东西就是把老师那本书，挑能考的，用你听得懂的话再说一遍。
 - 薄肌版：别看了，直接翻提词器。
+
+## 更新日志
+
+- **v1.1.0** — 修复 `check_docs.py` 把计算题误判为「缺答案字母」；新增「题干一致」「题号连续」「本章速览」「如图无图提醒」四项自检；修复文档命令块里复制即报错的字面 `\n`；PPT 备注改为按关系文件读取；补 `requirements.txt`。
+- **v1.0.0** — 首个公开版本。
 
 ## License
 

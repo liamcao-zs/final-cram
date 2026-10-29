@@ -1,6 +1,6 @@
 ---
 name: final-cram
-version: "1.0.0"
+version: "1.1.0"
 display_name: 期末速通
 display_name_en: Final Cram
 description_zh: 期末速通资料生成器：读取 PDF、PPT、作业和真题，先划定学习边界，再按章节逐个突破，输出双轨 Word 笔记（老奶版/薄肌版）、无答案通关题库和双解析答案版。
@@ -46,8 +46,8 @@ description: 期末速通资料生成器。读取 PDF/PPT/作业/真题，先划
 ### Phase 0 · 摄取（5 分钟）
 
 ```bash
-# 脚本固定位置（下同）
-python ~/.claude/skills/final-cram/scripts/extract_materials.py \
+B=~/.claude/skills/final-cram/scripts   # 本 skill 的 scripts/ 目录
+python "$B/extract_materials.py" \
   "资料文件夹" --out "期末速通_课程/_extract"
 ```
 
@@ -117,17 +117,21 @@ python ~/.claude/skills/final-cram/scripts/extract_materials.py \
 ### Phase 5 · 自检 + 渲染 + 验收
 
 ```bash
+# $B 指本 skill 的 scripts/ 目录；装在别处就把这里改成实际路径
 B=~/.claude/skills/final-cram/scripts
 
-# 先跑结构自检：题号对应、答案泄漏、缺图、两版对齐、游戏化措辞
-python $B/check_docs.py \n  --questions _source/questions.md --answers _source/answers.md \n  --grandma _source/notes_grandma.md --muscle _source/notes_muscle.md \n  --base-dir _source
+# 先跑结构自检：题号对应、题干一致、答案泄漏、缺图、两版对齐、游戏化措辞
+python "$B/check_docs.py" \
+  --questions _source/questions.md --answers _source/answers.md \
+  --grandma _source/notes_grandma.md --muscle _source/notes_muscle.md \
+  --base-dir _source
 
-python $B/build_docx.py --src _source/notes_grandma.md --out 01_速通笔记_老奶版.docx
-python $B/build_docx.py --src _source/notes_muscle.md  --out 01_速通笔记_薄肌版.docx
-python $B/build_docx.py --src _source/questions.md     --out 02_通关题库_无答案.docx
-python $B/build_docx.py --src _source/answers.md       --out 03_通关题库_答案解析.docx
+python "$B/build_docx.py" --src _source/notes_grandma.md --out 01_速通笔记_老奶版.docx
+python "$B/build_docx.py" --src _source/notes_muscle.md  --out 01_速通笔记_薄肌版.docx
+python "$B/build_docx.py" --src _source/questions.md     --out 02_通关题库_无答案.docx
+python "$B/build_docx.py" --src _source/answers.md       --out 03_通关题库_答案解析.docx
 
-python $B/verify_docx.py --src 01_速通笔记_老奶版.docx --out-dir _preview
+python "$B/verify_docx.py" --src 01_速通笔记_老奶版.docx --out-dir _preview
 ```
 
 逐页看图检查：封面、目录跳转、本章速览卡片不断裂、表格无孤行、四角水印不压字、无空白页。
@@ -159,7 +163,7 @@ python $B/verify_docx.py --src 01_速通笔记_老奶版.docx --out-dir _preview
 - [ ] 老奶版没有未解释的符号；薄肌版没有无条件的公式。
 - [ ] 题库覆盖矩阵无空格，题目按考察点去重。
 - [ ] 需要图的题都插了图，没有"如图"却无图。
-- [ ] `check_docs.py` 全绿：题号对应、无答案泄漏、图片存在、两版对齐。
+- [ ] `check_docs.py` 全绿：题号对应、题干一致、无答案泄漏、图片存在、两版对齐、本章速览。
 - [ ] 答案版题号与题库一一对应，每题都验算过。
 - [ ] 每章一句话存在，「耍起」每章不超过一次。
 - [ ] 四份 docx 都用 `verify_docx.py` 出过图，没有空白页。
@@ -176,6 +180,7 @@ python $B/verify_docx.py --src 01_速通笔记_老奶版.docx --out-dir _preview
 | 按 PPT 页数平分时间 | 重点章没时间 | 按优先级分，整章砍掉低优先级章 |
 | 两版只是换语气 | 老奶版仍看不懂 | 老奶版重写结构，不是改词 |
 | 答案版直接复用题库文件 | 无答案版被污染 | 两个独立源文件 |
+| 题库和答案版各改各的题干 | 学生对着错误的题看解析 | 先定题库，再复制生成答案版；`check_docs.py` 会比对题干 |
 | 秒杀法没写条件 | 考场套错 | 每招补"适用/不适用" |
 | 题目只换数字当新题 | 题库注水 | `check_docs.py` 按归一化题干抓近重复 |
 | 配图凭感觉找 | 图题对不上 | 先看 `图索引.md` 的页面文字，再 `--grid` 读坐标 |

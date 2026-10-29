@@ -17,9 +17,16 @@ from pathlib import Path
 
 sys.stdout.reconfigure(encoding="utf-8")
 
-import pymupdf as fitz
-import pythoncom
-import win32com.client
+try:
+    import pymupdf as fitz
+except ImportError:
+    sys.exit("缺少 pymupdf，先运行: pip install pymupdf")
+
+try:
+    import pythoncom
+    import win32com.client
+except ImportError:
+    sys.exit("缺少 pywin32（且需要本机安装 Microsoft Word），先运行: pip install pywin32")
 
 
 def docx_to_pdf(src: Path, dst: Path):
@@ -53,7 +60,10 @@ def main():
     out_dir.mkdir(parents=True, exist_ok=True)
     pdf = out_dir / (src.stem + ".pdf")
 
-    docx_to_pdf(src, pdf)
+    try:
+        docx_to_pdf(src, pdf)
+    except Exception as e:
+        sys.exit(f"调用 Word 失败（需要本机安装 Microsoft Word）：{e}")
     doc = fitz.open(pdf)
     print(f"PDF: {pdf}  页数: {doc.page_count}")
 

@@ -13,14 +13,17 @@ check_docs.py — 交付前的机械检查（不判断内容对错，只抓结�
     1. 题库与答案版的题号是否一一对应
     2. 答案版每题是否都有答案块
     3. 无答案版是否混入答案痕迹
-    4. 引用的图片是否存在
-    5. 老奶版/薄肌版章节是否对齐
-    6. 「耍起」是否超量
-    7. 是否残留 BOSS/血条/打怪/必杀技/通关标准
-    8. 表格列数是否一致
-    9. 源文件头是否缺字段
-    10. 题目之间是否近重复（同考点换数字会被抓出来）
-    11. 答案字母是否都在题目给出的选项里
+    4. 选择题的答案字母是否都在题目给出的选项里
+    5. 题库与答案版的题干是否逐题一致
+    6. 题目之间是否近重复（同考点换数字会被抓出来）
+    7. 每章题号是否从 1 开始且连续
+    8. 老奶版/薄肌版章节是否对齐
+    9. 笔记每章是否有「本章速览」
+    10. 引用的图片是否存在，文字说「如图」时是否真配了图
+    11. 「耍起」是否超量
+    12. 是否残留 BOSS/血条/打怪/必杀技/通关标准
+    13. 表格列数是否一致
+    14. 源文件头是否缺字段
 """
 
 import argparse
@@ -35,7 +38,10 @@ FAILS, WARNS, PASSES = [], [], []
 
 
 def read(p):
-    return Path(p).read_text(encoding="utf-8")
+    path = Path(p)
+    if not path.exists():
+        sys.exit(f"找不到文件: {p}")
+    return path.read_text(encoding="utf-8")
 
 
 def h1_titles(text):
@@ -95,23 +101,87 @@ def check_duplicates(q_text, threshold=0.86):
          "题目去重")
 
 
+def _to_ascii_letter(ch):
+    """全角 Ａ-Ｄ 转成 A-D，避免同一选项被当成两种写法。"""
+    o = ord(ch)
+    return chr(o - 0xFEE0) if 0xFF21 <= o <= 0xFF24 else ch
+
+
+def _option_letters(text):
+    return {_to_ascii_letter(x)
+            for x in re.findall(r"^([A-DＡ-Ｄ])[.、．]", text, re.M)}
+
+
 def check_answer_letters(q_text, a_text):
-    """答案字母必须落在题目实际给出的选项里。"""
+    """选择题的答案字母必须落在题目实际给出的选项里；非选择题跳过。"""
     qsec, asec = sections(q_text), sections(a_text)
-    bad = []
+    bad, checked = [], 0
     for qid, body in asec.items():
+        opts = _option_letters(qsec.get(qid, ""))
+        if not opts:
+            continue                    # 计算/简答题，答案本来就不是字母
         nl = chr(10)
         m = re.search(r"::: answer[^" + nl + r"]*" + nl + r"(.+?)" + nl + r":::", body, re.S)
         if not m:
             continue
+        checked += 1
         first = next((ln for ln in m.group(1).splitlines() if ln.strip()), "")
-        letters = re.findall(r"[A-D]", first.split("（")[0])
-        opts = set(re.findall(r"^([A-D])[.、．]", qsec.get(qid, ""), re.M))
+        plain = first.replace("*", "").strip()
+        head = re.match(r"^([A-Za-zＡ-Ｄ](?:[、,，\s]*[A-Za-zＡ-Ｄ])*)", plain)
+        raw = ("".join(re.findall(r"[A-Za-zＡ-Ｄ]", head.group(1))) if head
+               else "".join(re.findall(r"[A-DＡ-Ｄ]", plain.split("（")[0])))
+        letters = [_to_ascii_letter(x).upper() for x in raw]
         if not letters:
             bad.append(f"{qid}: 未识别到答案字母")
-        elif opts and any(x not in opts for x in letters):
+        elif any(x not in opts for x in letters):
             bad.append(f"{qid}: 答案 {''.join(letters)} 超出选项 {''.join(sorted(opts))}")
-    check(not bad, "答案字母都在选项内", "; ".join(bad[:6]), "答案与选项")
+    check(not bad, f"{checked} 道选择题答案字母都在选项内", "; ".join(bad[:6]), "答案与选项")
+
+
+def _stem_only(body):
+    """题号行之后、选项或答案块之前的部分，去掉所有空白，用于比对题干。"""
+    lines = body.splitlines()
+    if lines and re.match(r"^\d+-\d+", lines[0].strip()):
+        lines = lines[1:]
+    keep = []
+    for line in lines:
+        s = line.strip()
+        if (s.startswith("#") or s.startswith("::: answer")
+                or re.match(r"^[A-DＡ-Ｄ][.、．]", s)):
+            break
+        keep.append(line)
+    return "".join("".join(keep).split())
+
+
+def check_stem_match(q_text, a_text):
+    """答案版必须原样保留无答案版的题干，防止两边各改各的。"""
+    qsec, asec = sections(q_text), sections(a_text)
+    bad = []
+    for qid in qsec:
+        if qid not in asec:
+            continue
+        q_stem, a_stem = _stem_only(qsec[qid]), _stem_only(asec[qid])
+        if q_stem != a_stem:
+            bad.append(qid)
+    check(not bad, "两版题干逐题一致",
+          f"题干被改动: {', '.join(bad[:8])}", "题干一致")
+
+
+def check_numbering(q_text):
+    """每章题号应为 1-1, 1-2 … 连续，中间不跳号。"""
+    chapters = re.split(r"^#\s+", q_text, flags=re.M)[1:]
+    bad = []
+    for chunk in chapters:
+        lines = chunk.splitlines()
+        title = lines[0].split("|")[0].strip() if lines else ""
+        ids = re.findall(r"^###\s+(\d+)-(\d+)\b", chunk, re.M)
+        if not ids:
+            continue
+        nums = [int(b) for _, b in ids]
+        if nums != list(range(1, len(nums) + 1)):
+            bad.append(f"{title}: {nums}")
+    check(not bad, "每章题号从 1 开始且连续",
+          "题号不连续: " + "; ".join(bad[:5]), "题号连续")
 
 
 def check(cond, ok_msg, fail_msg, label):
@@ -176,6 +246,35 @@ def check_images(paths, base_dir):
                 missing.append(f"{Path(p).name} -> {rel}")
     check(not missing, f"{total} 张引用图都存在",
           "缺图: " + "; ".join(missing[:5]), "图片")
+
+    # 文字里说「如图」却整篇没有插图，多半是忘了配图
+    for p in paths:
+        p = Path(p)
+        if not p.exists():
+            continue
+        text = read(p)
+        refs = re.findall(r"如图|图示|下图", text)
+        if refs and not re.search(r"!\[[^\]]*\]\(", text):
+            warn(False, "",
+                 f"{p.name}: {len(refs)} 处「如图/图示/下图」但全文无插图",
+                 f"配图[{p.name}]")
+
+
+def check_overview(path):
+    """笔记每章开头应有「本章速览」；开篇/总览/提词器这类特殊页除外。"""
+    text = read(path)
+    chapters = re.split(r"^#\s+", text, flags=re.M)[1:]
+    missing = []
+    for chunk in chapters:
+        lines = chunk.splitlines()
+        title = lines[0].split("|")[0].strip() if lines else ""
+        if any(k in title for k in ("开篇", "总览", "提词器", "速记")):
+            continue
+        if "::: overview" not in chunk and "::: boss" not in chunk:
+            missing.append(title)
+    warn(not missing, f"{Path(path).name}: 每章都有本章速览",
+         f"{Path(path).name}: 缺本章速览 {missing[:5]}",
+         f"本章速览[{Path(path).name}]")
 
 
 def check_notes(g_path, m_path):
@@ -273,18 +372,23 @@ def main():
     args = ap.parse_args()
 
     if args.questions and args.answers:
+        q_text, a_text = read(args.questions), read(args.answers)
         check_pair(args.questions, args.answers)
-    if args.questions and args.answers:
-        check_answer_letters(read(args.questions), read(args.answers))
+        check_answer_letters(q_text, a_text)
+        check_stem_match(q_text, a_text)
     if args.questions:
         check_duplicates(read(args.questions), args.dup_threshold)
+        check_numbering(read(args.questions))
 
     if args.grandma and args.muscle:
         check_notes(args.grandma, args.muscle)
+    for p in dict.fromkeys(p for p in (args.grandma, args.muscle) if p):
+        check_overview(p)
 
     all_paths = [p for p in (args.questions, args.answers, args.grandma, args.muscle) if p]
     check_images(all_paths, args.base_dir)
-    check_playful([p for p in (args.questions, args.grandma, args.muscle) if p])
+    playful_paths = list(dict.fromkeys(p for p in (args.questions, args.grandma, args.muscle) if p))
+    check_playful(playful_paths)
     check_game_words(all_paths)
     check_tables(all_paths)
     check_front_matter(all_paths)

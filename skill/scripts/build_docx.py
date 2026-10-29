@@ -653,9 +653,11 @@ class Builder:
                 dpi = info.horz_dpi or 96
                 width_cm = info.width / dpi * 2.54
                 height_cm = info.height / dpi * 2.54
-                # 同时限制宽和高，避免竖长图撑出页面
+                # 同时限制宽和高，避免竖长图撑出页面。
+                # 只传 width，高度按原比例走；因此不能再把 width 抬回最小值，
+                # 否则超长竖图会重新撑出页面。
                 scale = min(1.0, 15.4 / max(width_cm, 0.1), 17.0 / max(height_cm, 0.1))
-                width_cm = max(width_cm * scale, 2.0)
+                width_cm = max(width_cm * scale, 0.1)
                 p.add_run().add_picture(str(path), width=Cm(width_cm))
             except Exception:
                 r = p.add_run(f"[图片无法读取: {src}]")

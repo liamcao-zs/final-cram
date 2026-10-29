@@ -1,0 +1,28 @@
+name: check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: 语法检查
+        shell: bash
+        run: python -m py_compile skill/scripts/*.py
+
+      - name: 示例自检
+        shell: bash
+        run: |
+          python skill/scripts/check_docs.py \
+            --questions skill/examples/demo-questions.md \
+            --answers skill/examples/demo-answers.md \
+            --grandma skill/examples/demo-notes.md \
+            --muscle skill/examples/demo-notes.md \
+            --base-dir skill/examples
